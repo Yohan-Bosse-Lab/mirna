@@ -6,8 +6,8 @@ output:
   html_document:
     number_sections: F
 params:
-  datapath: 'C:/Users/renseb01/Documents/Steinberg_Christian/REFRAME_miRNA/'
-  outputpath: 'C:/Users/renseb01/Documents/Steinberg_Christian/REFRAME_miRNA/'
+  datapath: 'C:/Users/renseb01/Documents/Steinberg_Christian/miRNA/results/'
+  outputpath: 'C:/Users/renseb01/Documents/Steinberg_Christian/miRNA/'
 ---
 
 
@@ -21,6 +21,7 @@ library(DESeq2)
 library(dplyr)
 library(tidyr)
 library(RColorBrewer)
+library(ggrepel)
 ```
 
 
@@ -44,20 +45,20 @@ for(i in 1:length(files)){
   
   temp = read.table(file.path(params$datapath,'bams',files[i]),header =F)
   temp = temp[-nrow(temp),]
-  if(i == 1) mirna_expression = data.frame(expression = temp$V3)
+  if(i == 1) mirna_expression1 = data.frame(expression = temp$V3)
   
-  if(i >1) mirna_expression = cbind(mirna_expression,temp$V3)
+  if(i >1) mirna_expression1 = cbind(mirna_expression1,temp$V3)
       
   if(i == length(files)) {
     lengths = temp$V2
     names = sapply(strsplit(files,'_',fixed = T),"[",4);
-    colnames(mirna_expression) = gsub('.idxstats','',names);
-    rownames(mirna_expression) = temp$V1}
+    colnames(mirna_expression1) = gsub('.idxstats','',names);
+    rownames(mirna_expression1) = temp$V1}
 } 
 
 #
-rowm =rowMeans(mirna_expression[,1:12])
-mirna_expression = mirna_expression[order(rowm,decreasing = T),]
+#rowm =rowMeans(mirna_expression1[,1:12])
+mirna_expression1 = mirna_expression1[order(rowm,decreasing = T),]
 mirna_expression$mirna = rownames(mirna_expression)
 mirna_expression$mirna = factor(mirna_expression$mirna,levels = mirna_expression$mirna)
 
@@ -82,6 +83,9 @@ df = data.frame(`Number of miRNA`= c(nrow(mirna_expression),
            )
 
 df$`Number or reads aligned` = factor(df$`Number or reads aligned`, levels = c('Total','<1','>1','>5','>10','>100','>1k','>10k','>100k','>1M'))
+
+#plots
+plot(log(mirna_expression1[,12],10),log(mirna_expression[,12],10),xlab = 'log10 miRNA expression (9M reads)', ylab = 'log10 miRNA expression (4M reads)')
 ```
 
 

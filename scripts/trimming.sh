@@ -7,7 +7,7 @@ fastq_trim='/mnt/sde/renseb01/Documents/Christian_Steinberg/mirna/data/fastq_tri
 #for loop
 for R1 in $fastqdir/*_R1.fastq.gz
   do
-    nameR1=${R1//'/home/renseb01/Documents/lord/raw_data/REFRAME_miRNA/pilot_2025/'}
+    nameR1=${R1//$fastqdir/}
     trimgal_R1=${nameR1//'_R1.fastq.gz'/'_R1_val_1.fq.gz'}
     cutadapt_R1=${nameR1//'_R1.fastq.gz'/'_cutadapt_R1.fq.gz'}
 
