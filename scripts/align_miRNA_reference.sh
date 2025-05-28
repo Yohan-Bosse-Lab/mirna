@@ -2,9 +2,9 @@
 
 
 # Variables
-REFERENCE_GENOME='/mnt/sde/renseb01/Documents/Steinberg_Christian/mirna/data/thymine/Hsa_mature_thymine.fa'
-REFERENCE_INDEX='/mnt/sde/renseb01/Documents/Steinberg_Christian/mirna/data/thymine/reference_index'
-FASTQDIR='/mnt/sde/renseb01/Documents/Steinberg_Christian/mirna/data/fastq_trimmed/'
+REFERENCE_GENOME='/mnt/sde/renseb01/Documents/Steinberg_Christian/mirna/data/reference/thymine/Hsa_mature_thymine.fa'
+REFERENCE_INDEX='/mnt/sde/renseb01/Documents/Steinberg_Christian/mirna/data/reference/thymine/reference_index'
+FASTQDIR='/mnt/sde/renseb01/Documents/Steinberg_Christian/mirna/data/fastq_trim/'
 OUTDIR='/mnt/sde/renseb01/Documents/Steinberg_Christian/mirna/results/bams/'
 THREADS=8
 

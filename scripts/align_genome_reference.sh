@@ -2,7 +2,7 @@
 
 
 # Variables
-REFERENCE_GENOME='/mnt/sde/renseb01/Documents/Steinberg_Christian/miRNA/data/thymine/Hsa_mature_thymine.fa'
+REFERENCE_GENOME='/mnt/sde/renseb01/Documents/Steinberg_Christian/miRNA/data/reference/thymine/Hsa_mature_thymine.fa'
 REFERENCE_INDEX='/mnt/sde/renseb01/Documents/rnaseq/data/reference_genome/reference_bowtie'
 FASTQDIR='/mnt/sde/renseb01/Documents/Steinberg_Christian/miRNA/data/fastq_trim/'
 OUTDIR='/mnt/sde/renseb01/Documents/Steinberg_Christian/miRNA/results/bams_genome/'
@@ -26,7 +26,6 @@ for READS in $FASTQDIR*R1_trimmed.fq
     #bwa mem -t $THREADS $REFERENCE_GENOME $READS > "$OUTDIR${PREFIX}.sam"
     bowtie -n 0 -l 15 -S $REFERENCE_INDEX $READS >$OUTDIR${PREFIX}.sam
 
-
     # Convert SAM to BAM (optional but recommended for downstream processing)
     echo "Converting SAM to BAM..."
     samtools view -Sb "$OUTDIR${PREFIX}.sam" > "$OUTDIR${PREFIX}.bam"
@@ -39,7 +38,6 @@ for READS in $FASTQDIR*R1_trimmed.fq
     echo "Indexing the sorted BAM file..."
     samtools index "$OUTDIR${PREFIX}_sorted.bam"
 
-
     # Count the data
     samtools idxstats "$OUTDIR${PREFIX}_sorted.bam" >"$OUTDIR${PREFIX}.idxstats"
 
@@ -49,12 +47,12 @@ for READS in $FASTQDIR*R1_trimmed.fq
 
     echo "Alignment completed. Output files:"
     echo "- ${PREFIX}_sorted.bam"
-    echo "- ${PREFIX}_sorted.bam.bai"  # BAM index file
+    echo "- ${PREFIX}_sorted.bam.bai"
   done
 
 
 #count with htseq
-echo 'Counting with htseq'
+echo "Counting with htseq..."
 htseq-count --nonunique all \
             --format=bam \
             --mode=intersection-nonempty \

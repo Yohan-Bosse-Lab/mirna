@@ -6,8 +6,8 @@ output:
   html_document:
     number_sections: F
 params:
-  datapath: 'C:/Users/renseb01/Documents/Steinberg_Christian/miRNA/results/'
-  outputpath: 'C:/Users/renseb01/Documents/Steinberg_Christian/miRNA/'
+  resultspath: 'C:/Users/renseb01/Documents/Steinberg_Christian/miRNA/results/'
+  figurespath: 'C:/Users/renseb01/Documents/Steinberg_Christian/miRNA/figures'
 ---
 
 
@@ -37,13 +37,13 @@ library(ggrepel)
   
   
   
-
+#check what? 
 ```{r data}
-files = list.files(file.path(params$datapath,'bams'),recursive = TRUE,pattern = 'idxstats$')
+files = list.files(file.path(params$resultspath,'bams'),recursive = TRUE,pattern = 'idxstats$')
 
 for(i in 1:length(files)){
   
-  temp = read.table(file.path(params$datapath,'bams',files[i]),header =F)
+  temp = read.table(file.path(params$resultspath,'bams',files[i]),header =F)
   temp = temp[-nrow(temp),]
   if(i == 1) mirna_expression1 = data.frame(expression = temp$V3)
   
@@ -57,8 +57,8 @@ for(i in 1:length(files)){
 } 
 
 #
-#rowm =rowMeans(mirna_expression1[,1:12])
-mirna_expression1 = mirna_expression1[order(rowm,decreasing = T),]
+rowm = rowMeans(mirna_expression1[,1:12])
+mirna_expression = mirna_expression1[order(rowm,decreasing = T),]
 mirna_expression$mirna = rownames(mirna_expression)
 mirna_expression$mirna = factor(mirna_expression$mirna,levels = mirna_expression$mirna)
 
@@ -83,9 +83,6 @@ df = data.frame(`Number of miRNA`= c(nrow(mirna_expression),
            )
 
 df$`Number or reads aligned` = factor(df$`Number or reads aligned`, levels = c('Total','<1','>1','>5','>10','>100','>1k','>10k','>100k','>1M'))
-
-#plots
-plot(log(mirna_expression1[,12],10),log(mirna_expression[,12],10),xlab = 'log10 miRNA expression (9M reads)', ylab = 'log10 miRNA expression (4M reads)')
 ```
 
 
@@ -152,13 +149,12 @@ volcano_plot = ggplot(res,aes(x = log2FoldChange, y = minuslogpadj,color = genes
   ylim(c(-1,20)) +
   geom_text_repel(data = annot,aes(x = log2FoldChange, y = minuslogpadj,label = miRNA),color = 'black') +
   ggtitle('Differential Expression (Case vs. Control)') +
-  ylab( bquote(-log[10]~p[adjusted])) +
+  ylab( bquote(-log[10]~(p[adjusted]))) +
   xlab( bquote(log[2]~Fold~change)) +
   scale_color_discrete(type  = brewer.pal(9,'Set1')[c(1,2)]) +
   theme_bw() +
   theme(legend.position= 'none',legend.position.inside = c(0.8, 0.8),
                 legend.background = element_rect(fill="lightgray"))
-     
 ```
 
 
@@ -166,7 +162,7 @@ volcano_plot = ggplot(res,aes(x = log2FoldChange, y = minuslogpadj,color = genes
 # save it
 ```{r session, message= T}
 #save it 
-pdf(file.path(params$outputpath,paste0('figures/Figure1_miRNA.pdf')),width = 12,height = 8)
+pdf(file.path(params$figurespath,paste0('Figure1_miRNA.pdf')),width = 12,height = 8)
 totals + histograms + boxplot + volcano_plot + plot_annotation(tag_levels = 'A')
 dev.off()
 ```
@@ -175,6 +171,7 @@ dev.off()
 # session info 
 ```{r session, message= T}
 sessionInfo()
+
 ```
      
      
