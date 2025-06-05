@@ -39,11 +39,14 @@ library(ggrepel)
   
 #check what? 
 ```{r data}
-files = list.files(file.path(params$resultspath,'bams'),recursive = TRUE,pattern = 'idxstats$')
+dataset = c('bams','bams_REFRAME_2025')
+d=2
+
+files = list.files(file.path(params$resultspath,dataset[d]),recursive = TRUE,pattern = 'idxstats$')
 
 for(i in 1:length(files)){
   
-  temp = read.table(file.path(params$resultspath,'bams',files[i]),header =F)
+  temp = read.table(file.path(params$resultspath,dataset[d],files[i]),header =F)
   temp = temp[-nrow(temp),]
   if(i == 1) mirna_expression1 = data.frame(expression = temp$V3)
   
@@ -57,12 +60,12 @@ for(i in 1:length(files)){
 } 
 
 #
-rowm = rowMeans(mirna_expression1[,1:12])
+rowm = rowMeans(mirna_expression1[,1:(ncol(mirna_expression1)-1)])
 mirna_expression = mirna_expression1[order(rowm,decreasing = T),]
 mirna_expression$mirna = rownames(mirna_expression)
 mirna_expression$mirna = factor(mirna_expression$mirna,levels = mirna_expression$mirna)
 
-mirna_expression_pivot = pivot_longer(mirna_expression,cols = 1:12,values_to = 'expression')
+mirna_expression_pivot = pivot_longer(mirna_expression,cols = 1:(ncol(mirna_expression1)-1),values_to = 'expression')
 mirna_expression_pivot$type = ifelse(regexpr('CASE',mirna_expression_pivot$name)>0,'CASE','CONTROL')
 top10 = head(mirna_expression$mirna,10)
 
@@ -78,13 +81,12 @@ df = data.frame(`Number of miRNA`= c(nrow(mirna_expression),
            nrow(mirna_expression[rowm>10000,]),
            nrow(mirna_expression[rowm>100000,]),
            nrow(mirna_expression[rowm>1000000,])),
-           `Number or reads aligned`  = c('Total','<1','>1','>5','>10','>100','>1k','>10k','>100k','>1M'),
+           `Number or reads aligned per sample`  = c('Total','<1','>1','>5','>10','>100','>1k','>10k','>100k','>1M'),
            check.names = F
            )
 
-df$`Number or reads aligned` = factor(df$`Number or reads aligned`, levels = c('Total','<1','>1','>5','>10','>100','>1k','>10k','>100k','>1M'))
+df$`Number or reads aligned per sample` = factor(df$`Number or reads aligned per sample`, levels = c('Total','<1','>1','>5','>10','>100','>1k','>10k','>100k','>1M'))
 ```
-
 
 
 ```{r plots}
@@ -113,7 +115,7 @@ boxplot = mirna_expression_pivot %>%
   ggtitle('Top 10 most expressed miRNA') 
 
 #Totals
-totals = ggplot(df, aes(x = `Number or reads aligned`, y = `Number of miRNA`)) +
+totals = ggplot(df, aes(x = `Number or reads aligned per sample`, y = `Number of miRNA`)) +
     geom_bar(stat="identity", fill="steelblue")+
     geom_text(aes(label=`Number of miRNA`), vjust=c(rep(1.6,5),rep(-0.5,5)), color=c(rep("white",5),rep('black',5)), size=3.5)+
     theme_bw() +
@@ -121,11 +123,10 @@ totals = ggplot(df, aes(x = `Number or reads aligned`, y = `Number of miRNA`)) +
 ```
 
 
-
 ```{r degs}
 conditions = ifelse(regexpr('CASE',colnames(mirna_expression)[-13])>0,'CASE','CONTROL') 
 
-dds <- DESeqDataSetFromMatrix(mirna_expression[,-13], DataFrame(conditions), ~ conditions)
+dds <- DESeqDataSetFromMatrix(mirna_expression[,-ncol(mirna_expression)], DataFrame(conditions), ~ conditions)
      dds = DESeq(dds)
      resultsNames(dds)
      res = results(dds)
@@ -157,12 +158,26 @@ volcano_plot = ggplot(res,aes(x = log2FoldChange, y = minuslogpadj,color = genes
                 legend.background = element_rect(fill="lightgray"))
 ```
 
+#PCA
+```{r PCA, message= T}
+library(FactoMineR)
+#library(factoextra)
+type = ifelse(regexpr('CASE',colnames(mirna_expression)[1:(ncol(mirna_expression)-1)])>0,'CASE','CONTROL')
+
+
+res.pca = PCA(t(mirna_expression[,1:(ncol(mirna_expression)-1)]),scale = T, graph = F,ncp = 50)
+
+fviz_pca_ind(res.pca, col.ind = type,repel = TRUE, geom.ind = 'point')
+
+
+```
+
 
 
 # save it
 ```{r session, message= T}
 #save it 
-pdf(file.path(params$figurespath,paste0('Figure1_miRNA.pdf')),width = 12,height = 8)
+pdf(file.path(params$figurespath,paste0('Figure1_miRNA',dataset[d],'.pdf')),width = 12,height = 8)
 totals + histograms + boxplot + volcano_plot + plot_annotation(tag_levels = 'A')
 dev.off()
 ```
@@ -170,6 +185,7 @@ dev.off()
 
 # session info 
 ```{r session, message= T}
+
 sessionInfo()
 
 ```

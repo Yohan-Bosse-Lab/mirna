@@ -1,11 +1,13 @@
 #!/bin/bash
 
+conda activate trimming
+
 #dir
 fastqdir='/home/renseb01/Documents/lord/raw_data/REFRAME_miRNA/pilot_2025/'
-fastq_trim='/mnt/sde/renseb01/Documents/Steinberg_Christian/mirna/data/fastq_trim/'
+fastq_trim='/mnt/sde/renseb01/Documents/Steinberg_Christian/mirna/data/fastq_trim3/'
 
 #for loop
-for R1 in $fastqdir/*_R1.fastq.gz
+for R1 in $fastqdir/*CASE*
   do
     #prepare files
     nameR1=${R1//$fastqdir/}
@@ -27,9 +29,9 @@ for R1 in $fastqdir/*_R1.fastq.gz
                 --path_to_cutadapt cutadapt
 
     #remove the specific polyG sequences
-    cutadapt -a GGGGGGGGGGGGGGG \
-             -A GGGGGGGGGGGGGGG \
-             --cores 2 \
-             $fastq_trim$cutadapt_R1 \
-             $fastq_trim$trimgal_R1
+#    cutadapt -a GGGGGGGGGGGGGGG \
+#             -A GGGGGGGGGGGGGGG \
+#             --cores 2 \
+#             -o $fastq_trim$cutadapt_R1 \
+#             $fastq_trim$trimgal_R1
   done
