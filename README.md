@@ -1,5 +1,4 @@
-# mirna
-  * miRNA analysis pipeline
+# miRNA analysis pipeline
   * 1. trimming the reads (`trim_galore` &  `cutadapt`) with  `trimming.sh` (single-end pilot) or `trimming_PE.sh` (paired-end REFRAME).
     * Note that the REFRAME dataset are paired-end, the pilot was single end. We will only use the REFRAME dataset. 
   * 2. Align the reads 
