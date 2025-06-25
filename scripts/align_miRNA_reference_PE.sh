@@ -44,7 +44,7 @@ for READS1 in $FASTQDIR*_trimmed_R1.fq.gz
     echo "Indexing the sorted BAM file..."
     samtools index "$OUTDIR${PREFIX}_sorted.bam"
 
-    # Count the data
+    # Generate the expression data
     samtools idxstats "$OUTDIR${PREFIX}_sorted.bam" >"$OUTDIR${PREFIX}.idxstats"
 
     # Clean up: Remove the original SAM file if desired

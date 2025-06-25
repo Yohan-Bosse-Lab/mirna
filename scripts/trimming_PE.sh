@@ -1,5 +1,7 @@
 #!/bin/bash
 
+#need to activate the conda environnement: 'conda activate trimming'
+
 #dir
 fastqdir='/home/renseb01/Documents/lord/raw_data/REFRAME_miRNA/REFRAME_2025/fastq_files/'
 fastq_trim='/mnt/sde/renseb01/Documents/Steinberg_Christian/mirna/data/fastq_trim_REFRAME_2025/'

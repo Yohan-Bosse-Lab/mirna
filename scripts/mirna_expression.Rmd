@@ -26,6 +26,7 @@ library(ggrepel)
 
 
 # Trimming & QC
+(pilot study sample)
   * Total reads processed:              10,446,968
   * Reads with adapters:                10,382,220 (99.4%)
   * Reads removed (<16bp):              1,158,793
@@ -35,9 +36,22 @@ library(ggrepel)
   * Quality-trimmed:                    95,440,235 bp (9.0%)
   * Total written (filtered):           233,886,560 bp (22.2%)
   
-  
+(REFRAME)
+  * Total reads processed:              14,313,687
+  * Reads with adapters:                14,282,758 (99.8%)
+  * Reads written (passing filters):    14,313,687 (100.0%)
+
+  * Total basepairs processed:          1,445,682,387 bp
+  * Quality-trimmed:                    3,368,715 bp (0.2%)
+  * Total written (filtered):           324,514,059 bp (22.4%)
   
 #check what? 
+ * `bams_REFRAME` is the true dataset of 223 patients. 
+ * `bams` is just a small pilot. 
+ 
+
+
+#Read statistics 
 ```{r data}
 dataset = c('bams','bams_REFRAME_2025')
 d=2
@@ -85,7 +99,13 @@ df = data.frame(`Number of miRNA`= c(nrow(mirna_expression),
            check.names = F
            )
 
+
+#
 df$`Number or reads aligned per sample` = factor(df$`Number or reads aligned per sample`, levels = c('Total','<1','>1','>5','>10','>100','>1k','>10k','>100k','>1M'))
+
+
+#
+write.table(mirna_expression,file.path(params$resultspath,'mirna_expression.csv'),row.names = F)
 ```
 
 
@@ -106,7 +126,7 @@ boxplot = mirna_expression_pivot %>%
   filter(mirna %in% top10) %>%
   ggplot(aes(x=mirna, y = expression,fill = type)) + 
   geom_boxplot(outliers = F,alpha = 0.5) +
-  ylab('Number of reads') +
+  ylab('Number of reads per sample') +
   xlab('miRNAs') +
   theme_bw() +
   theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1),
@@ -123,62 +143,13 @@ totals = ggplot(df, aes(x = `Number or reads aligned per sample`, y = `Number of
 ```
 
 
-```{r degs}
-conditions = ifelse(regexpr('CASE',colnames(mirna_expression)[-13])>0,'CASE','CONTROL') 
-
-dds <- DESeqDataSetFromMatrix(mirna_expression[,-ncol(mirna_expression)], DataFrame(conditions), ~ conditions)
-     dds = DESeq(dds)
-     resultsNames(dds)
-     res = results(dds)
-     res = res[order(res$pvalue),] #order by pval
-     res = res[res$baseMean>0,] #remove 0 expression values
-     res = res[!is.na(res$padj),] #remove NA
-
-
-#
-res$miRNA  = rownames(res)     
-res$minuslogpadj = -log(res$padj,10)
-res$genes = 'non-significant'
-res$genes[res$minuslogpadj>5.1 | abs(res$log2FoldChange)>1.6] = 'significant'
-
-annot = res[res$genes == 'significant', ]
-#annot = annot[1:5,]
-#
-volcano_plot = ggplot(res,aes(x = log2FoldChange, y = minuslogpadj,color = genes)) + 
-  geom_point() +
-  xlim(c(-4,4)) +
-  ylim(c(-1,20)) +
-  geom_text_repel(data = annot,aes(x = log2FoldChange, y = minuslogpadj,label = miRNA),color = 'black') +
-  ggtitle('Differential Expression (Case vs. Control)') +
-  ylab( bquote(-log[10]~(p[adjusted]))) +
-  xlab( bquote(log[2]~Fold~change)) +
-  scale_color_discrete(type  = brewer.pal(9,'Set1')[c(1,2)]) +
-  theme_bw() +
-  theme(legend.position= 'none',legend.position.inside = c(0.8, 0.8),
-                legend.background = element_rect(fill="lightgray"))
-```
-
-#PCA
-```{r PCA, message= T}
-library(FactoMineR)
-#library(factoextra)
-type = ifelse(regexpr('CASE',colnames(mirna_expression)[1:(ncol(mirna_expression)-1)])>0,'CASE','CONTROL')
-
-
-res.pca = PCA(t(mirna_expression[,1:(ncol(mirna_expression)-1)]),scale = T, graph = F,ncp = 50)
-
-fviz_pca_ind(res.pca, col.ind = type,repel = TRUE, geom.ind = 'point')
-
-
-```
-
-
 
 # save it
 ```{r session, message= T}
 #save it 
-pdf(file.path(params$figurespath,paste0('Figure1_miRNA',dataset[d],'.pdf')),width = 12,height = 8)
-totals + histograms + boxplot + volcano_plot + plot_annotation(tag_levels = 'A')
+
+pdf(file.path(params$figurespath,paste0('Figure1_miRNA_',dataset[d],'.pdf')),width = 10,height = 8)
+(totals | histograms) / (boxplot | plot_spacer()) + plot_annotation(tag_levels = 'A')
 dev.off()
 ```
 

@@ -1,0 +1,282 @@
+---
+title: "miRNA expression"
+author: "Sébastien Renaut (sebastien.renaut@criucpq.ulaval.ca)"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    number_sections: F
+params:
+  resultspath: 'C:/Users/renseb01/Documents/Steinberg_Christian/miRNA/results/'
+  figurespath: 'C:/Users/renseb01/Documents/Steinberg_Christian/miRNA/figures'
+---
+
+
+
+```{r setup, include=FALSE}
+knitr::opts_knit$set(root.dir = params$outputpath)
+knitr::opts_chunk$set(echo = F)
+library(ggplot2)
+library(glmnet)
+library(caret)
+library(FactoMineR)
+library(factoextra)
+library(RColorBrewer)
+```
+
+
+```{r load data, include=FALSE}
+# Load libraries
+mirna_expression = read.table(file.path(params$resultspath,'mirna_expression.csv'),header = T,check.names = F, row.names = 224)
+```
+
+
+#PCA
+```{r PCA, message= T}
+labels = ifelse(regexpr('CASE',colnames(mirna_expression))>0,'CASE','CONTROL')
+
+#prepare data in the right format
+pcadata = mirna_expression[rowSums(mirna_expression) > quantile(rowSums(mirna_expression))[4],]
+
+#do the pca
+res.pca_scaled = PCA(t(pcadata),scale = T, graph = F,ncp = 50)
+
+#visualize
+pca_scaled = fviz_pca_ind(res.pca_scaled, col.ind = labels,repel = TRUE, geom.ind = 'point')
+```
+
+
+#LASSO REGRESSION
+* split data
+* perform LASSO regression with 100 resamples. this allows you to find a final gene set.
+
+```{r biomarker discovery, include=FALSE}
+#set seed
+set.seed(12345)
+
+# Convert labels to binary: 0 = control, 1 = case
+labels_binary = ifelse(labels_pca == 'CASE',1,0)
+data <- t(as.matrix(mirna_expression)) # must be a transposed matrix for glmnet
+
+# Store coefficients when resampling
+n = 100
+boot_coefs <- matrix(NA, nrow = n, ncol = ncol(data))
+colnames(boot_coefs) <- colnames(data)
+
+conf_matrix = list()
+
+#n resamples
+for(i in 1:n){
+  # Split data into training and test sets
+  train_index <- createDataPartition(labels_binary, p = 0.6, list = F)
+  data_train <- data[train_index, ]
+  labels_train <- labels_binary[train_index]
+  data_test  <- data[-train_index, ]
+  labels_test  <- labels_binary[-train_index]
+
+  #Fit LASSO logistic regression (alpha = 1 for LASSO)
+  lasso_fit <- cv.glmnet(
+    data_train, labels_train,
+    family = "binomial",
+    alpha = 1,             # LASSO
+    standardize = TRUE,    # standardize features
+    type.measure = "class", # classification error
+    nfolds = 10)
+
+  # Best lambda (penalty term)
+  best_lambda <- lasso_fit$lambda.min
+
+  #Extract selected genes & Coefficients at best lambda
+  coef_lasso <- coef(lasso_fit, s = "lambda.min")
+  boot_coefs[i, ] <- as.vector(coef_lasso)[-1] 
+
+  # Predict on test set
+  pred_probs <- predict(lasso_fit, newx = data_test, s = "lambda.min", type = "response")
+  pred_class <- ifelse(pred_probs > 0.5, 1, 0)
+
+  # Evaluate performance
+  conf_matrix[[i]] <- confusionMatrix(as.factor(pred_class), as.factor(labels_test))
+
+  if(i %% 10 == 0) print(paste0('Done resampling ',i, ' of 100, The time is: ',Sys.time()))
+  }
+```
+
+#Find the best gene set ( & 95 % confidence interval for gene importance).
+```{r 95 CI}
+  # Compute 2.5%, 50%, 97.5% quantiles for each coefficient
+  gene_importance_df = data.frame(Lower95 = 1:ncol(boot_coefs),
+                                  Median = 0,
+                                  Upper95 = 0,
+                                  Mean = 0,
+                                  NonZeros = 0,
+                                  Gene = colnames(boot_coefs))
+
+  for(j in 1:ncol(boot_coefs)) {
+    gene_importance_df[j,1:3] = quantile(boot_coefs[,j], probs = c(0.025, 0.5, 0.975))
+    gene_importance_df$Mean[j] = mean(boot_coefs[,j], na.rm = T)
+    gene_importance_df$NonZeros[j] = length(boot_coefs[abs(boot_coefs[,j])>0,j])
+  }
+
+  # Filter to non-zero median coefficients (LASSO selection)
+  gene_importance_df = gene_importance_df[gene_importance_df$Median != 0, ]
+
+  # View top robust genes
+  gene_importance_df[order(gene_importance_df$Median),]
+```
+
+
+###fit final model with the best genes
+```{r finalbestgene model}
+
+  # Split data into training and test sets (optional but recommended)
+  train_index <- createDataPartition(labels_binary, p = 0.6, list = F)
+  data_train <- data[train_index,gene_importance_df$Gene]
+  labels_train <- labels_binary[train_index]
+  data_test  <- data[-train_index,gene_importance_df$Gene]
+  labels_test  <- labels_binary[-train_index]
+
+  #Fit LASSO logistic regression (alpha = 1 for LASSO)
+  lasso_fit <- cv.glmnet(
+    data_train, labels_train,
+    family = "binomial",
+    alpha = 1,             # LASSO
+    standardize = TRUE,    # standardize features
+    type.measure = "class", # classification error
+    nfolds = 10)
+
+  # Extract selected genes & Coefficients at best lambda
+  coef_lasso <- coef(lasso_fit, s = "lambda.min")
+  geneset = as.vector(coef_lasso)[-1] 
+  
+  # Predict on test set
+  pred_probs <- predict(lasso_fit, newx = data_test, s = "lambda.min", type = "response")
+  pred_class <- ifelse(pred_probs > 0.5, 1, 0)
+
+  # Evaluate performance
+  confusionMatrix(as.factor(pred_class), as.factor(labels_test))
+```
+
+
+#plot ROC curve
+```{r ROC curve, include=FALSE}
+# Compute ROC curve
+roc_object <- roc(labels_test, as.vector(pred_probs))
+
+# Compute sensitivity confidence intervals at multiple specificity points
+roc_ci_vals <- ci.se(roc_object, specificities = seq(0, 1, 0.01), boot.n = 1000, conf.level = 0.95)
+
+# Convert to data frame for ggplot
+roc_ci_df <- data.frame(
+  specificity = as.numeric(rownames(roc_ci_vals)),
+  sensitivity_mean = roc_ci_vals[, "50%"],
+  sensitivity_lower = roc_ci_vals[, "2.5%"],
+  sensitivity_upper = roc_ci_vals[, "97.5%"]
+)
+
+
+# Extract data for ggplot
+roc_df <- data.frame(
+  specificity = rev(roc_object$specificities),
+  sensitivity = rev(roc_object$sensitivities)
+)
+
+# Compute AUC and CI
+auc_val <- auc(roc_object)
+auc_ci <- ci.auc(roc_object)
+
+# Create ggplot ROC curve
+gplot_roc = ggplot() +
+  geom_ribbon(data = roc_ci_df,
+              aes(x = 1 - specificity, ymin = sensitivity_lower, ymax = sensitivity_upper),
+              fill = "lightblue", alpha = 0.4) +
+  geom_line(data = roc_df,
+            aes(x = 1 - specificity, y = sensitivity),
+            color = "blue", size = 1.2) +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "gray") +
+  labs(
+    title = "ROC Curve (LASSO Logistic Regression)",
+    subtitle = paste0("AUC = ", round(auc_val, 3), 
+                      " (95% CI: ", round(auc_ci[1], 3), " – ", round(auc_ci[3], 3), ")\n",'Sensitivity = ',
+                      round(conf_matrix[[1]]$byClass[1],3),', Specificity = ',round(conf_matrix[[1]]$byClass[2],3),'\n60 / 40 (training / testing) split' ),
+    x = "False Positive Rate (1 - Specificity)",
+    y = "True Positive Rate (Sensitivity)"
+  ) +
+  theme_minimal(base_size = 14)
+```
+
+
+# gene importance
+```{r gene importance for the LASSO logistic regression, message = T}
+# Extract non-zero coefficients (excluding intercept)
+coef_lasso_df <- as.data.frame(as.matrix(coef_lasso))
+colnames(coef_lasso_df) <- "Coefficient"
+coef_lasso_df$Gene <- rownames(coef_lasso_df)
+
+# Remove intercept and zero coefficients
+coef_lasso_df <- coef_lasso_df[coef_lasso_df$Coefficient != 0, ]
+coef_lasso_df <- coef_lasso_df[coef_lasso_df$Gene != "(Intercept)", ]
+
+# Order by absolute coefficient size
+coef_lasso_df <- coef_lasso_df[order(abs(coef_lasso_df$Coefficient), decreasing = TRUE), ]
+
+# Load ggplot2 if not already installed
+# Plot
+gplot_importance = ggplot(coef_lasso_df, aes(x = reorder(Gene, abs(Coefficient)), y = Coefficient)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  coord_flip() +
+  labs(title = "Final selected genes from model",
+       x = "Gene",
+       y = "Coefficient (LASSO)") +
+  theme_minimal()
+```
+
+#Differential expresssion
+```{r degs}
+dds <- DESeqDataSetFromMatrix(mirna_expression, DataFrame(labels), ~ labels)
+     dds = DESeq(dds)
+     resultsNames(dds)
+     res = results(dds)
+     res = res[order(res$pvalue),] #order by pval
+     res = res[res$baseMean>0,] #remove 0 expression values
+     res = res[!is.na(res$padj),] #remove NA
+
+
+#
+res$miRNA  = rownames(res)     
+res$minuslogpadj = -log(res$padj,10)
+res$LASSO.regression  = 'non-selected genes'
+res$LASSO.regression[rownames(res)%in% gene_importance_df$Gene] = 'selected genes'
+
+annot = res[res$LASSO.regression == 'selected genes',]
+#annot = annot[1:5,]
+#
+volcano_plot = ggplot(res,aes(x = log2FoldChange, y = minuslogpadj,color = LASSO.regression)) + 
+  geom_point(shape = 21) +
+  xlim(c(-4,4)) +
+  ylim(c(-1,50)) +
+  geom_text_repel(data = annot,aes(x = log2FoldChange, y = minuslogpadj,label = miRNA),color = 'black') +
+  ggtitle('Differential Expression (Case vs. Control)') +
+  ylab( bquote(-log[10]~(p[adjusted]))) +
+  xlab( bquote(log[2]~Fold~change)) +
+  scale_color_discrete(type  = brewer.pal(9,'Set1')[c(1,2)]) +
+  theme_bw() +
+  theme(legend.position= 'right',legend.position.inside = c(0.8, 0.8),
+                legend.background = element_rect(fill="lightgray"))
+```
+
+
+
+# save it
+```{r session, message= T}
+#save it 
+pdf(file.path(params$figurespath,paste0('Figure2_biomarkerdiscovery_.pdf')),width = 12,height = 8)
+pca_scaled + gplot_roc + gplot_importance + volcano_plot + plot_annotation(tag_levels = 'A')
+dev.off()
+```
+
+
+# session info 
+```{r session, message= T}
+sessionInfo()
+```
+     
+     
